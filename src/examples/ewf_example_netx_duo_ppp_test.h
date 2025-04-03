@@ -45,7 +45,8 @@ extern "C" {
 //ULONG http_server_ip = IP_ADDRESS(23, 35, 229, 160);
 //ULONG http_server_ip = IP_ADDRESS(20, 228, 124, 154);
 //ULONG http_server_ip = IP_ADDRESS(92, 123, 229, 216);
-ULONG http_server_ip = IP_ADDRESS(104,95,181,163);
+//ULONG http_server_ip = IP_ADDRESS(104,95,181,163);
+    ULONG http_server_ip = IP_ADDRESS(142,250,191,142); // www.google.com, probably won't work on port 80, but we will get a redirect
 UINT http_server_port = EWF_EXAMPLE_NETX_DUO_TEST_TCP_HTTP_SERVER_PORT;
 char http_request[] = EWF_EXAMPLE_NETX_DUO_TEST_TCP_HTTP_REQUEST_STR;
 ULONG http_message_length = sizeof(http_request) - 1;

@@ -143,11 +143,14 @@ typedef enum _ewf_result
 #ifndef EWF_DEBUG
 #define EWF_LOG(...)
 #else
+#define EWF_LOG(...)  do {printf(__VA_ARGS__);}while(0)
+/*
 #define EWF_LOG(...)                                                            \
 do {                                                                            \
     (void)fprintf(stdout, __VA_ARGS__);                                         \
     (void)fflush(stdout);                                                       \
 } while (0)
+*/
 #endif
 #endif
 

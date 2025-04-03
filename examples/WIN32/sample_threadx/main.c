@@ -212,7 +212,7 @@ UINT    status;
         printf("           thread 7 mutex obtained:       %lu\n\n", thread_7_counter);
 
         /* Sleep for 10 ticks.  */
-        tx_thread_sleep(10);
+        tx_thread_sleep(10000/TX_TIMER_TICKS_PER_SECOND);
 
         /* Set event flag 0 to wakeup thread 5.  */
         status =  tx_event_flags_set(&event_flags_0, 0x1, TX_OR);

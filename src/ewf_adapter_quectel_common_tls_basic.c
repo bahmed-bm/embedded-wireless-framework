@@ -13,11 +13,13 @@
 #include "ewf_platform.h"
 #include "ewf_lib.h"
 
+#if(EWF_ADAPTER_QUECTEL_COMMON_TLS_BASIC_ENABLED)
 ewf_adapter_api_tls_basic ewf_adapter_quectel_common_api_tls_basic  =
 {
     ewf_adapter_quectel_common_tls_basic_init,
     ewf_adapter_quectel_common_tls_basic_clean,
 };
+#endif
 
 /******************************************************************************
  *

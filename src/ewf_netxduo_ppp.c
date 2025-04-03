@@ -350,7 +350,7 @@ ewf_result ewf_interface_data_mode_ppp_byte_receive_callback(ewf_interface* inte
     EWF_PARAMETER_NOT_USED(buffer_length);
 
 #ifdef EWF_DEBUG
-    EWF_LOG("[%s][%c]\n", "PPP_RECV", *buffer_ptr);
+    //EWF_LOG("[%s][%c]\n", "PPP_RECV", *buffer_ptr); //bahmed
 #endif
 
     (void)nx_ppp_byte_receive(g_ppp0_ptr, *buffer_ptr);

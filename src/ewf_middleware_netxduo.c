@@ -1075,7 +1075,7 @@ NX_PACKET_POOL *pool_ptr = nx_driver_information.nx_driver_information_packet_po
                 if ((nx_driver_sockets[i].tcp_connected == NX_FALSE) &&
                     (nx_driver_sockets[i].is_client == NX_FALSE))
                 {
-
+#if(0)//bahmed
                     /* TCP server. Try accept. */
                     if (_nx_tcp_socket_driver_establish(nx_driver_sockets[i].socket_ptr, interface_ptr, 0))
                     {
@@ -1084,6 +1084,7 @@ NX_PACKET_POOL *pool_ptr = nx_driver_information.nx_driver_information_packet_po
                         tx_thread_sleep(NX_DRIVER_THREAD_INTERVAL);
                         continue;
                     }
+#endif
                 }
             }
             else

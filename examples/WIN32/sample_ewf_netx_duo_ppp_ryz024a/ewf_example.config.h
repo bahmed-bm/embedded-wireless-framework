@@ -9,6 +9,7 @@
 #ifndef __ewf_example_conf__h__included__
 #define __ewf_example_conf__h__included__
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -40,7 +41,7 @@ extern "C" {
  */
 
 /** @brief Define the WIN32 COM port interface serial port file name */
-#define EWF_CONFIG_INTERFACE_WIN32_COM_PORT_FILE_NAME               ("\\\\.\\COM65")
+#define EWF_CONFIG_INTERFACE_WIN32_COM_PORT_FILE_NAME               ("\\\\.\\COM43")
 
 /** @brief Define the WIN32 COM port interface serial port baud rate */
 #define EWF_CONFIG_INTERFACE_WIN32_COM_PORT_BAUD_RATE               (CBR_115200)
@@ -66,7 +67,7 @@ extern "C" {
 #define EWF_CONFIG_SIM_PIN                                          ("0000")
 
 /** @brief The SIM operator APN */
-#define EWF_CONFIG_SIM_APN                                          ("internet.telekom")
+#define EWF_CONFIG_SIM_APN                                          ("apn.trimble.com")
 
 /** @brief The modem context ID used */
 #define EWF_CONFIG_CONTEXT_ID                                       (1)

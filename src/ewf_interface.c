@@ -208,10 +208,12 @@ ewf_result ewf_interface_send(ewf_interface* interface_ptr, const uint8_t * cons
 
     /* Log the buffer */
 #ifdef EWF_DEBUG
+#if(0)//bahmed
     EWF_LOG(
         "[SEND][%4lu][%s]\n", 
         length, 
         ewfl_escape_str_to_str_buffer((char *) buffer, length));
+#endif
 #endif
 
     if (interface_ptr->tokenizer_ptr && interface_ptr->tokenizer_ptr->send)
@@ -276,14 +278,17 @@ static ewf_result _ewf_interface_enqueue(ewf_interface* interface_ptr, ewf_platf
 
 #ifdef EWF_DEBUG
     /* Log the data */
-    EWF_LOG("[%s][%4lu]",
-        (queue_ptr == interface_ptr->response_queue_ptr) ? "RECV" : "URC^",
-        interface_ptr->current_message.buffer_length);
-    EWF_LOG(ewfl_escape_str_to_str_buffer(
-            (char*)interface_ptr->current_message.buffer_ptr,
-            interface_ptr->current_message.buffer_length));
+    if(!interface_ptr->response_queue_ptr) //bahmed
+    {
+    	EWF_LOG("[%s][%4lu]",
+    		(queue_ptr == interface_ptr->response_queue_ptr) ? "RECV" : "URC^",
+        		interface_ptr->current_message.buffer_length);
+    	EWF_LOG(ewfl_escape_str_to_str_buffer(
+            	(char*)interface_ptr->current_message.buffer_ptr,
+				interface_ptr->current_message.buffer_length));
 
-    EWF_LOG("\n");
+    	EWF_LOG("\n");
+    }
 #endif
 
     /* Clear the current RX buffer */

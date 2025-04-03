@@ -17,8 +17,8 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
 #include "app_threadx.h"
+#include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -34,6 +34,12 @@
 #include "stm32u5xx_ll_exti.h"
 #include "stm32u5xx_ll_gpio.h"
 #include "stm32u5xx_ll_usart.h"
+
+#define QUECTEL_BG96 		1
+#define RENESAS_RYZ024A 	2
+
+#define MODEM_TYPE RENESAS_RYZ024A
+
 
 #include "ewf_lib.c"
 #include "ewf_platform_threadx.c"
@@ -56,17 +62,34 @@
 #include "ewf_adapter_api_modem_packet_domain.c"
 #include "ewf_adapter_api_modem_sim_utility.c"
 #include "ewf_adapter_api_modem_sms.c"
-#include "ewf_adapter_quectel_bg96.c"
-#include "ewf_adapter_quectel_common_tokenizer.c"
-#include "ewf_adapter_quectel_common_urc.c"
-#include "ewf_adapter_quectel_common_control.c"
-#include "ewf_adapter_quectel_common_context.c"
-#include "ewf_adapter_quectel_common_info.c"
-#include "ewf_adapter_quectel_common_internet.c"
-#include "ewf_adapter_quectel_common_ufs.c"
-#include "ewf_adapter_quectel_common_mqtt_basic.c"
-#include "ewf_adapter_quectel_common_tls_basic.c"
-#include "test/ewf_adapter_quectel_bg96_test.c"
+#if(MODEM_TYPE == QUECTEL_BG96)
+# include "ewf_adapter_quectel_bg96.c"
+# include "ewf_adapter_quectel_common_tokenizer.c"
+# include "ewf_adapter_quectel_common_urc.c"
+# include "ewf_adapter_quectel_common_control.c"
+# include "ewf_adapter_quectel_common_context.c"
+# include "ewf_adapter_quectel_common_info.c"
+# include "ewf_adapter_quectel_common_internet.c"
+# include "ewf_adapter_quectel_common_ufs.c"
+# include "ewf_adapter_quectel_common_mqtt_basic.c"
+# include "ewf_adapter_quectel_common_tls_basic.c"
+# include "test/ewf_adapter_quectel_bg96_test.c"
+#endif
+
+#if(MODEM_TYPE == RENESAS_RYZ024A)
+# include "ewf_adapter_renesas_ryz024a.c"
+# include "ewf_adapter_renesas_common_tokenizer.c"
+# include "ewf_adapter_renesas_common_urc.c"
+# include "ewf_adapter_renesas_common_control.c"
+//# include "ewf_adapter_renesas_common_context.c"
+# include "ewf_adapter_renesas_common_info.c"
+# include "ewf_adapter_renesas_common_internet.c"
+//# include "ewf_adapter_renesas_common_ufs.c"
+# include "ewf_adapter_renesas_common_mqtt_basic.c"
+# include "ewf_adapter_renesas_common_tls_basic.c"
+
+#endif
+
 #include "ewf_example.config.h"
 
 /* USER CODE END Includes */
@@ -94,6 +117,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 
+UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
@@ -106,16 +130,37 @@ static void SystemPower_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ICACHE_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+/* Define the thread for running Azure SDK on ThreadX (THREADX IoT Platform).  */
+#ifndef SAMPLE_STACK_SIZE
+#define SAMPLE_STACK_SIZE      (2048)
+#endif /* SAMPLE_STACK_SIZE  */
+
+#ifndef SAMPLE_THREAD_PRIORITY
+#define SAMPLE_THREAD_PRIORITY (4)
+#endif /* SAMPLE_THREAD_PRIORITY  */
+
+/* The thread control block  */
+static TX_THREAD  sample_thread;
+
+/* Define the thread stack.  */
+static ULONG sample_thread_stack[SAMPLE_STACK_SIZE / sizeof(ULONG)];
+
+/* The EWF NetX Duo PPP test.  */
+ewf_result ewf_example_netx_duo_ppp_test(ewf_adapter* adapter_ptr);
+
+
 void ewf_quectel_bg96_power_on()
 {
 	/* Reference: Quectel BG96 Hardware Design V1.4 */
-	HAL_GPIO_WritePin(STMD_RESET_GPIO_Port, STMD_RESET_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(STMD_RESET_GPIO_Port, STMD_RESET_Pin, GPIO_PIN_SET); // bahmed GPIO_PIN_RESET
 	HAL_GPIO_WritePin(STMD_PWR_EN_GPIO_Port, STMD_PWR_EN_Pin, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(STMD_DTR_GPIO_Port, STMD_DTR_Pin, GPIO_PIN_RESET);
 
@@ -142,6 +187,8 @@ void ewf_quectel_bg96_power_on()
 	/* Set STMD_PWR_EN_Pin to 0 */
 	HAL_GPIO_WritePin(STMD_PWR_EN_GPIO_Port, STMD_PWR_EN_Pin, GPIO_PIN_RESET);
 
+	HAL_GPIO_WritePin(STMD_EN_GPIO_Port, STMD_EN_Pin, GPIO_PIN_SET);
+
 	/* wait for the modem to be in ready state  */
 	printf("Waiting for BG96 modem to be ready after power ON\n");
 	tx_thread_sleep(TX_TIMER_TICKS_PER_SECOND * 10);
@@ -154,8 +201,124 @@ void ewf_quectel_bg96_power_on()
 	MX_USART3_UART_Init();
 }
 
+
+#if(MODEM_TYPE == RENESAS_RYZ024A)
+void sample_thread_entry(ULONG parameter)
+{
+    ewf_result result;
+
+    ewf_allocator* message_allocator_ptr = NULL;
+    ewf_interface* interface_ptr = NULL;
+    ewf_adapter* adapter_ptr = NULL;
+
+    EWF_ALLOCATOR_THREADX_STATIC_DECLARE(message_allocator_ptr, message_allocator,
+        EWF_CONFIG_MESSAGE_ALLOCATOR_BLOCK_COUNT,
+        EWF_CONFIG_MESSAGE_ALLOCATOR_BLOCK_SIZE);
+
+    EWF_ALLOCATOR_THREADX_STATIC_DECLARE(message_allocator_ptr, message_allocator,
+        EWF_CONFIG_MESSAGE_ALLOCATOR_BLOCK_COUNT,
+        EWF_CONFIG_MESSAGE_ALLOCATOR_BLOCK_SIZE);
+    EWF_INTERFACE_STM32_UART_STATIC_DECLARE(interface_ptr, stm32_uart_port, &huart3);
+    EWF_ADAPTER_RENESAS_RYZ024A_STATIC_DECLARE(adapter_ptr, renesas_ryz024a, message_allocator_ptr, NULL, interface_ptr);
+
+	/* Power on the STMOD+ BG96 modem */
+    ewf_quectel_bg96_power_on();
+
+
+    // Start the adapter
+    if (ewf_result_failed(result = ewf_adapter_start(adapter_ptr)))
+    {
+        EWF_LOG_ERROR("Failed to start the adapter, ewf_result %d.\n", result);
+        exit(result);
+    }
+    else
+    {
+        EWF_LOG("Adapter Start.\n");
+    }
+
+    // Set the ME functionality to minimum to clear out any previous connections
+    if (ewf_result_failed(result = ewf_adapter_modem_functionality_set(adapter_ptr, EWF_ADAPTER_MODEM_FUNCTIONALITY_MINIMUM)))
+    {
+        EWF_LOG("[Warning][Failed to the ME functionality]\n");
+    }
+    else
+    {
+        EWF_LOG("Modem functionality set to EWF_ADAPTER_MODEM_FUNCTIONALITY_MINIMUM\n");
+    }
+
+    // Set the APN
+    /*
+    if (ewf_result_failed(result = ewf_adapter_modem_pdp_apn_set(adapter_ptr, EWF_CONFIG_CONTEXT_ID, EWF_ADAPTER_MODEM_PDP_TYPE_IP, EWF_CONFIG_SIM_APN)))
+    {
+        EWF_LOG_ERROR("Failed to the set APN, ewf_result %d.\n", result);
+        exit(result);
+    }
+    else
+    {
+        EWF_LOG("APN Set to %s\n", EWF_CONFIG_SIM_APN);
+    }*/
+
+    // Set the ME functionality
+    if (ewf_result_failed(result = ewf_adapter_modem_functionality_set(adapter_ptr, EWF_ADAPTER_MODEM_FUNCTIONALITY_FULL)))
+    {
+        EWF_LOG_ERROR("Failed to the ME functionality, ewf_result %d.\n", result);
+        return;
+    }
+    else
+    {
+        EWF_LOG("Modem functionality set to EWF_ADAPTER_MODEM_FUNCTIONALITY_FULL\n");
+    }
+
+
+    /* Wait time for modem to be ready after modem is registered to network */
+    ewf_platform_sleep(200);
+
+    // Set the SIM PIN
+    if (0) //ewf_result_failed(result = ewf_adapter_modem_sim_pin_enter(adapter_ptr, EWF_CONFIG_SIM_PIN))) bahmed
+    {
+        EWF_LOG_ERROR("Failed to the SIM PIN, ewf_result %d.\n", result);
+        exit(result);
+    }
+    else
+    {
+        EWF_LOG("SIM PIN Set.\n");
+    }
+
+    if (ewf_result_failed(result = ewf_adapter_modem_network_registration_check(adapter_ptr, EWF_ADAPTER_MODEM_CMD_QUERY_EPS_NETWORK_REG, 1000)))
+    {
+        EWF_LOG("[ERROR][Failed to register to network.]\n");
+        return;
+    }
+	else
+	{
+		EWF_LOG("Registered to network.\n");
+	}
+
+    // Call the NetX Duo test example
+    if (ewf_result_failed(result = ewf_example_netx_duo_ppp_test(adapter_ptr)))
+    {
+        EWF_LOG_ERROR("The NetX Duo test example failed, ewf_result %d.\n", result);
+        exit(result);
+    }
+    	else
+	{
+		EWF_LOG("The NetX Duo test example passed.\n");
+	}
+
+    EWF_LOG("\nDone!\n");
+
+    /* Stay here forever.  */
+    while (1)
+    {
+        EWF_LOG(".");
+        ewf_platform_sleep(EWF_PLATFORM_TICKS_PER_SECOND);
+    }
+}
+#endif
+
 void thread_sample_entry(ULONG thread_input)
 {
+#if(MODEM_TYPE == QUECTEL_BG96)
     ewf_result result;
 
     ewf_allocator* message_allocator_ptr = NULL;
@@ -207,6 +370,14 @@ void thread_sample_entry(ULONG thread_input)
         EWF_LOG(".");
         tx_thread_sleep(TX_TIMER_TICKS_PER_SECOND);
     }
+#endif
+
+#if(MODEM_TYPE == RENESAS_RYZ024A)
+	sample_thread_entry(thread_input);
+	return;
+#endif
+
+
 }
 
 /* USER CODE END 0 */
@@ -217,6 +388,7 @@ void thread_sample_entry(ULONG thread_input)
   */
 int main(void)
 {
+
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -243,6 +415,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_ICACHE_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -250,6 +423,7 @@ int main(void)
   MX_ThreadX_Init();
 
   /* We should never get here as control is now taken by the scheduler */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -320,11 +494,14 @@ void SystemClock_Config(void)
   */
 static void SystemPower_Config(void)
 {
+  HAL_PWREx_EnableVddIO2();
 
   /*
    * Disable the internal Pull-Up in Dead Battery pins of UCPD peripheral
    */
   HAL_PWREx_DisableUCPDDeadBattery();
+/* USER CODE BEGIN PWR */
+/* USER CODE END PWR */
 }
 
 /**
@@ -360,6 +537,54 @@ static void MX_ICACHE_Init(void)
 }
 
 /**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
   * @brief USART3 Initialization Function
   * @param None
   * @retval None
@@ -380,7 +605,7 @@ static void MX_USART3_UART_Init(void)
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
   huart3.Init.Mode = UART_MODE_TX_RX;
-  huart3.Init.HwFlowCtl = UART_HWCONTROL_RTS_CTS;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart3.Init.OverSampling = UART_OVERSAMPLING_16;
   huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
@@ -415,6 +640,8 @@ static void MX_USART3_UART_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
+/* USER CODE BEGIN MX_GPIO_Init_1 */
+/* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
@@ -436,6 +663,9 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(STMD_SIM_SELECT0_GPIO_Port, STMD_SIM_SELECT0_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(STMD_EN_GPIO_Port, STMD_EN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : CN2_STMOD_UART_SEL_Pin */
   GPIO_InitStruct.Pin = CN2_STMOD_UART_SEL_Pin;
@@ -483,10 +713,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : STMD_EN_Pin */
+  GPIO_InitStruct.Pin = STMD_EN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(STMD_EN_GPIO_Port, &GPIO_InitStruct);
+
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI6_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI6_IRQn);
 
+/* USER CODE BEGIN MX_GPIO_Init_2 */
+/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
@@ -500,7 +739,9 @@ PUTCHAR_PROTOTYPE
 {
     /* Place your implementation of fputc here */
     /* e.g. write a character to the USART1 and Loop until the end of transmission */
-    ITM_SendChar(ch);
+    //ITM_SendChar(ch);
+	uint8_t c = (uint8_t) ch;
+	HAL_UART_Transmit(&huart1, &c, 1,100);
     return ch;
 }
 

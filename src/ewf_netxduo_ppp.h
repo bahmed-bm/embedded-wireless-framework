@@ -13,6 +13,7 @@
 
 #include "ewf.h"
 
+
 /* EWF enabled to use with Azure RTOS NetX */
 #if (EWF_CONFIG_AZURE_RTOS_NETX == 1)
 

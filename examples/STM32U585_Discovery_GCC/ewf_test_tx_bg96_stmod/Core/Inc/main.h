@@ -74,10 +74,13 @@ void Error_Handler(void);
 #define STMD_DTR_GPIO_Port GPIOC
 #define STMD_SIM_DATAG1_Pin GPIO_PIN_1
 #define STMD_SIM_DATAG1_GPIO_Port GPIOG
+#define STMD_EN_Pin GPIO_PIN_8
+#define STMD_EN_GPIO_Port GPIOG
 #define STMD_SIM_CLK_Pin GPIO_PIN_0
 #define STMD_SIM_CLK_GPIO_Port GPIOG
 #define STMD_RESET_Pin GPIO_PIN_13
 #define STMD_RESET_GPIO_Port GPIOB
+
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

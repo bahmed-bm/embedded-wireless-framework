@@ -12,7 +12,17 @@
 
 #include "ewf_lib.h"
 
+#ifdef EWF_LOG_ERROR
+#define EWF_DEBUG_ENABLED
+#endif
+
+#ifndef EWF_DEBUG_ENABLED
 #ifdef EWF_DEBUG
+#define EWF_DEBUG_ENABLED
+#endif
+#endif
+
+#ifdef EWF_DEBUG_ENABLED
 
 /** This can be configured to match the application requirements  */
 #ifndef EWF_ESCAPE_STR_BUFFER_SIZE

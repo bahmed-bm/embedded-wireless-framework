@@ -99,6 +99,10 @@ ewf_result ewf_example_netx_duo_ppp_test(ewf_adapter* adapter_ptr)
         EWF_LOG_ERROR("Failed configure PPP: ewf_result %d.\n", result);
         exit(result);
     }
+    else
+    {
+        EWF_LOG("PPP configured successfully.\n");
+    }
 
     /* Link is fully up and operational. All NetX activities are now available.
        Enable NetX services that your application would need. 
@@ -112,6 +116,10 @@ ewf_result ewf_example_netx_duo_ppp_test(ewf_adapter* adapter_ptr)
         EWF_LOG_ERROR("Failed to enable ARP, status: %d.\n", status);
         return EWF_RESULT_CONNECTION_FAILED;
     }
+    else
+    {
+        EWF_LOG("ARP enabled successfully.\n");
+    }
 
     /* Enable TCP traffic.  */
     status = nx_tcp_enable(&ip_0);
@@ -120,6 +128,10 @@ ewf_result ewf_example_netx_duo_ppp_test(ewf_adapter* adapter_ptr)
         EWF_LOG_ERROR("Failed to enable TCP, status: %d.\n", status);
         return EWF_RESULT_CONNECTION_FAILED;
     }
+    	else
+	{
+		EWF_LOG("TCP enabled successfully.\n");
+	}
 
     /* Enable ICMP.  */
     status = nx_icmp_enable(&ip_0);
@@ -128,6 +140,10 @@ ewf_result ewf_example_netx_duo_ppp_test(ewf_adapter* adapter_ptr)
         EWF_LOG_ERROR("Failed to enable ICMP, status: %d.\n", status);
         return EWF_RESULT_CONNECTION_FAILED;
     }
+    else
+    {
+        EWF_LOG("ICMP enabled successfully.\n");
+	}
 
     /* Enable UDP traffic.  */
     status = nx_udp_enable(&ip_0);
@@ -135,6 +151,10 @@ ewf_result ewf_example_netx_duo_ppp_test(ewf_adapter* adapter_ptr)
     {
         EWF_LOG_ERROR("Failed to enable UDP, status: %d.\n", status);
         return EWF_RESULT_CONNECTION_FAILED;
+    }
+    else
+    {
+        EWF_LOG("UDP enabled successfully.\n");
     }
 
     ewf_example_ppp_mode_netx_duo_test(&ip_0);
@@ -145,6 +165,10 @@ ewf_result ewf_example_netx_duo_ppp_test(ewf_adapter* adapter_ptr)
         EWF_LOG_ERROR("Failed to exit data mode: ewf_result %d.\n", result);
         exit(result);
     }
+    else
+    {
+        EWF_LOG("Data mode exited successfully.\n");
+	}   
 
     return EWF_RESULT_OK;
 }
@@ -182,12 +206,13 @@ ewf_result ewf_example_test_netx_duo_icmp_ping(NX_IP* ip_ptr)
     uint8_t error_count = 0;
     NX_PACKET* response = NULL;
     UINT status = 0;
-    while (counter < 5)
+    while (counter < 1)
     {
         UINT ping_status = nx_icmp_ping(ip_ptr, ipv4_address, "!!!!!", 5, &response, 5 * NX_IP_PERIODIC_RATE);
         if (NX_SUCCESS == ping_status)
         {
             EWF_LOG("ICMP ping success, counter: %d\n", counter);
+            printf("ICMP ping success, counter: %d\n", counter);
         }
         else
         {

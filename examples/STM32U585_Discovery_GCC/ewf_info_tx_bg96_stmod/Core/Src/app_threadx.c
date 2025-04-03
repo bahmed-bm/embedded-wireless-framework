@@ -61,12 +61,9 @@ static ULONG thread_sample_stack[THREAD_SAMPLE_STACK_SIZE / sizeof(ULONG)];
 UINT App_ThreadX_Init(VOID *memory_ptr)
 {
   UINT ret = TX_SUCCESS;
-  TX_BYTE_POOL *byte_pool = (TX_BYTE_POOL*)memory_ptr;
-
-   /* USER CODE BEGIN App_ThreadX_MEM_POOL */
-  (void)byte_pool;
+  /* USER CODE BEGIN App_ThreadX_MEM_POOL */
+  //(void)byte_pool;
   /* USER CODE END App_ThreadX_MEM_POOL */
-
   /* USER CODE BEGIN App_ThreadX_Init */
 
   /* Create the example thread.  */
@@ -88,7 +85,7 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
 }
 
   /**
-  * @brief  MX_ThreadX_Init
+  * @brief  Function that implements the kernel's initialization.
   * @param  None
   * @retval None
   */

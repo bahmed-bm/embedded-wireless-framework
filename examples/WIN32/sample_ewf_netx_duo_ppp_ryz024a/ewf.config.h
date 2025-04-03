@@ -9,6 +9,9 @@
 #ifndef __ewf__config__h__included__
 #define __ewf__config__h__included__
 
+
+#include <stdio.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -20,10 +23,27 @@ extern "C" {
  ****************************************************************************/
 
 /** Define this symbol to enable compilation of debug code. When this symbol is not defined, debug code is not present and the footprint is reduced.  */
-#define EWF_DEBUG
+//#define EWF_DEBUG
 
 /** Define this symbol to enable verbose logging */
 //#define EWF_LOG_VERBOSE
+
+#define EWF_LOG(...)                                                            \
+do {                                                                            \
+    (void)fprintf(stdout, __VA_ARGS__);                                         \
+    (void)fflush(stdout);                                                       \
+} while (0)
+
+#define EWF_LOG_ERROR(...)                                                      \
+do {                                                                            \
+    EWF_LOG(                                                                    \
+        "\n\n"                                                                  \
+        "ERROR:\n"                                                              \
+        "[%s]:[%d]\n"                                                           \
+        "function: [%s]\n\n",                                                   \
+        __FILE__, __LINE__, __func__);                                          \
+    EWF_LOG(__VA_ARGS__);                                                       \
+} while (0)
 
 /** Define this symbol to enable checking of function parameters. When this symbol is not defined, parameter checking code is not present and the footprint is reduced.  */
 #define EWF_PARAMETER_CHECKING
