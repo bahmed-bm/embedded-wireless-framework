@@ -64,6 +64,12 @@ void ewf_ppp_rx_thread_entry(ULONG thread_input)
         {
             tx_thread_sleep(1);
         }
+
+        // exit the loop if the thread has been terminated
+        if(0) //_tx_thread_current_ptr->tx_thread_state == TX_TERMINATEDTX_TERMINATED)
+        {
+        	break;
+        }
     }
 }
 
@@ -119,6 +125,8 @@ ewf_result ewf_adapter_data_mode_exit(ewf_adapter* adapter_ptr)
 
     ewf_result result;
 
+    //nx_ip_interface_detach(g_interface0_ptr);
+
     nx_ppp_stop(g_ppp0_ptr);
 
     nx_ip_delete(g_ip0_ptr);
@@ -136,6 +144,14 @@ ewf_result ewf_adapter_data_mode_exit(ewf_adapter* adapter_ptr)
     /* Wait for 1 second after inputing the exit string ("+++") */
     ewf_platform_sleep(1 * EWF_PLATFORM_TICKS_PER_SECOND);
 
+    // Delete the PPP receive thread
+    tx_thread_terminate(&ewf_ppp_rx_thread);
+    tx_thread_delete(&ewf_ppp_rx_thread);
+
+    g_interface0_ptr->data_mode = false;
+    EWF_LOG("[ADAPTER DATA MODE OFF]\n");
+
+
 #ifdef EWF_DEBUG
     if (ewf_result_failed(result = ewf_interface_send_command(interface_ptr, "AT\r"))) return result;
     if (ewf_result_failed(result = ewf_interface_drop_all_responses(interface_ptr))) return result;
@@ -145,11 +161,6 @@ ewf_result ewf_adapter_data_mode_exit(ewf_adapter* adapter_ptr)
     if (ewf_result_failed(result = ewf_interface_drop_all_responses(interface_ptr))) return result;
 #endif
 
-    // Delete the PPP receive thread
-    tx_thread_delete(&ewf_ppp_rx_thread);
-
-    g_interface0_ptr->data_mode = false;
-    EWF_LOG("[ADAPTER DATA MODE OFF]\n");
 
     // Delete terminate and delete RX thread
     return EWF_RESULT_OK;

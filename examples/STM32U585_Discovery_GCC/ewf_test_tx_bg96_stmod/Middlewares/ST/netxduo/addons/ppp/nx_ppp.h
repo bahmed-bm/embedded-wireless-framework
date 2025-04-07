@@ -85,13 +85,13 @@ extern   "C" {
 #define NX_PPP_DISABLE_INFO
 */
 
-/* If defined, this enables PPP event logging.
-#define NX_PPP_DEBUG_LOG_ENABLE
-*/
+/* If defined, this enables PPP event logging.*/
+//#define NX_PPP_DEBUG_LOG_ENABLE
 
-/* If defined, this enables data saved to the PPP log to be printed out (printf).  
-#define NX_PPP_DEBUG_LOG_PRINT_ENABLE
-*/
+
+/* If defined, this enables data saved to the PPP log to be printed out (printf).*/
+//#define NX_PPP_DEBUG_LOG_PRINT_ENABLE
+
 
 /* If defined, this disables CHAP authentication. 
 #define NX_PPP_DISABLE_CHAP

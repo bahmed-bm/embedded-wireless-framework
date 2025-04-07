@@ -37,9 +37,9 @@ extern "C" {
 //#define NX_ENABLE_TCPIP_OFFLOAD 1
 #define NX_ENABLE_INTERFACE_CAPABILITY 1
 //#define EWF_CONFIG_AZURE_RTOS_NETX 1
-#define NX_ENABLE_TCPIP_OFFLOAD 0
+#define NX_ENABLE_TCPIP_OFFLOAD 1
 #define EWF_ADAPTER_RENESAS_COMMON_NVM_ENABLED 0
-
+#define EWF_ADAPTER_SIERRA_COMMON_NVM_ENABLED  0
 
 /************************************************************************//**
  * @} *** group_configuration

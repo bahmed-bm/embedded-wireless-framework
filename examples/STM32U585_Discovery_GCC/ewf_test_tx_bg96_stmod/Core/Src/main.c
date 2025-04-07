@@ -37,8 +37,10 @@
 
 #define QUECTEL_BG96 		1
 #define RENESAS_RYZ024A 	2
+#define SIERRA_HL78XX       3
 
-#define MODEM_TYPE RENESAS_RYZ024A
+
+#define MODEM_TYPE SIERRA_HL78XX
 
 
 #include "ewf_lib.c"
@@ -87,8 +89,23 @@
 //# include "ewf_adapter_renesas_common_ufs.c"
 # include "ewf_adapter_renesas_common_mqtt_basic.c"
 # include "ewf_adapter_renesas_common_tls_basic.c"
+#endif
+
+#if(MODEM_TYPE == SIERRA_HL78XX)
+# include "ewf_adapter_sierra_hl78xx.c"
+# include "ewf_adapter_sierra_common_tokenizer.c"
+# include "ewf_adapter_sierra_common_urc.c"
+# include "ewf_adapter_sierra_common_control.c"
+//# include "ewf_adapter_renesas_common_context.c"
+# include "ewf_adapter_sierra_common_info.c"
+# include "ewf_adapter_sierra_common_internet.c"
+//# include "ewf_adapter_renesas_common_ufs.c"
+# include "ewf_adapter_sierra_common_mqtt_basic.c"
+# include "ewf_adapter_sierra_common_tls_basic.c"
+
 
 #endif
+
 
 #include "ewf_example.config.h"
 
@@ -190,7 +207,7 @@ void ewf_quectel_bg96_power_on()
 	HAL_GPIO_WritePin(STMD_EN_GPIO_Port, STMD_EN_Pin, GPIO_PIN_SET);
 
 	/* wait for the modem to be in ready state  */
-	printf("Waiting for BG96 modem to be ready after power ON\n");
+	printf("Waiting for the modem to be ready after power ON\n");
 	tx_thread_sleep(TX_TIMER_TICKS_PER_SECOND * 10);
 	printf("Modem Ready!!!\n");
 
@@ -202,7 +219,7 @@ void ewf_quectel_bg96_power_on()
 }
 
 
-#if(MODEM_TYPE == RENESAS_RYZ024A)
+
 void sample_thread_entry(ULONG parameter)
 {
     ewf_result result;
@@ -219,7 +236,13 @@ void sample_thread_entry(ULONG parameter)
         EWF_CONFIG_MESSAGE_ALLOCATOR_BLOCK_COUNT,
         EWF_CONFIG_MESSAGE_ALLOCATOR_BLOCK_SIZE);
     EWF_INTERFACE_STM32_UART_STATIC_DECLARE(interface_ptr, stm32_uart_port, &huart3);
+#if(MODEM_TYPE == RENESAS_RYZ024A)
     EWF_ADAPTER_RENESAS_RYZ024A_STATIC_DECLARE(adapter_ptr, renesas_ryz024a, message_allocator_ptr, NULL, interface_ptr);
+#endif
+
+#if(MODEM_TYPE == SIERRA_HL78XX)
+    EWF_ADAPTER_SIERRA_HL78XX_STATIC_DECLARE(adapter_ptr, renesas_ryz024a, message_allocator_ptr, NULL, interface_ptr);
+#endif
 
 	/* Power on the STMOD+ BG96 modem */
     ewf_quectel_bg96_power_on();
@@ -236,74 +259,81 @@ void sample_thread_entry(ULONG parameter)
         EWF_LOG("Adapter Start.\n");
     }
 
-    // Set the ME functionality to minimum to clear out any previous connections
-    if (ewf_result_failed(result = ewf_adapter_modem_functionality_set(adapter_ptr, EWF_ADAPTER_MODEM_FUNCTIONALITY_MINIMUM)))
-    {
-        EWF_LOG("[Warning][Failed to the ME functionality]\n");
-    }
-    else
-    {
-        EWF_LOG("Modem functionality set to EWF_ADAPTER_MODEM_FUNCTIONALITY_MINIMUM\n");
-    }
-
-    // Set the APN
-    /*
-    if (ewf_result_failed(result = ewf_adapter_modem_pdp_apn_set(adapter_ptr, EWF_CONFIG_CONTEXT_ID, EWF_ADAPTER_MODEM_PDP_TYPE_IP, EWF_CONFIG_SIM_APN)))
-    {
-        EWF_LOG_ERROR("Failed to the set APN, ewf_result %d.\n", result);
-        exit(result);
-    }
-    else
-    {
-        EWF_LOG("APN Set to %s\n", EWF_CONFIG_SIM_APN);
-    }*/
-
-    // Set the ME functionality
-    if (ewf_result_failed(result = ewf_adapter_modem_functionality_set(adapter_ptr, EWF_ADAPTER_MODEM_FUNCTIONALITY_FULL)))
-    {
-        EWF_LOG_ERROR("Failed to the ME functionality, ewf_result %d.\n", result);
-        return;
-    }
-    else
-    {
-        EWF_LOG("Modem functionality set to EWF_ADAPTER_MODEM_FUNCTIONALITY_FULL\n");
-    }
 
 
-    /* Wait time for modem to be ready after modem is registered to network */
-    ewf_platform_sleep(200);
+    for(int i=0; i <20; i++)
+    {
+		// Set the ME functionality to minimum to clear out any previous connections
+		if (ewf_result_failed(result = ewf_adapter_modem_functionality_set(adapter_ptr, EWF_ADAPTER_MODEM_FUNCTIONALITY_MINIMUM)))
+		{
+			EWF_LOG("[Warning][Failed to the ME functionality]\n");
+		}
+		else
+		{
+			EWF_LOG("Modem functionality set to EWF_ADAPTER_MODEM_FUNCTIONALITY_MINIMUM\n");
+		}
 
-    // Set the SIM PIN
-    if (0) //ewf_result_failed(result = ewf_adapter_modem_sim_pin_enter(adapter_ptr, EWF_CONFIG_SIM_PIN))) bahmed
-    {
-        EWF_LOG_ERROR("Failed to the SIM PIN, ewf_result %d.\n", result);
-        exit(result);
-    }
-    else
-    {
-        EWF_LOG("SIM PIN Set.\n");
-    }
+		// Set the APN
+		/*
+		if (ewf_result_failed(result = ewf_adapter_modem_pdp_apn_set(adapter_ptr, EWF_CONFIG_CONTEXT_ID, EWF_ADAPTER_MODEM_PDP_TYPE_IP, EWF_CONFIG_SIM_APN)))
+		{
+			EWF_LOG_ERROR("Failed to the set APN, ewf_result %d.\n", result);
+			exit(result);
+		}
+		else
+		{
+			EWF_LOG("APN Set to %s\n", EWF_CONFIG_SIM_APN);
+		}*/
 
-    if (ewf_result_failed(result = ewf_adapter_modem_network_registration_check(adapter_ptr, EWF_ADAPTER_MODEM_CMD_QUERY_EPS_NETWORK_REG, 1000)))
-    {
-        EWF_LOG("[ERROR][Failed to register to network.]\n");
-        return;
-    }
-	else
-	{
-		EWF_LOG("Registered to network.\n");
-	}
+		// Set the ME functionality
+		if (ewf_result_failed(result = ewf_adapter_modem_functionality_set(adapter_ptr, EWF_ADAPTER_MODEM_FUNCTIONALITY_FULL)))
+		{
+			EWF_LOG_ERROR("Failed to the ME functionality, ewf_result %d.\n", result);
+			return;
+		}
+		else
+		{
+			EWF_LOG("Modem functionality set to EWF_ADAPTER_MODEM_FUNCTIONALITY_FULL\n");
+		}
 
-    // Call the NetX Duo test example
-    if (ewf_result_failed(result = ewf_example_netx_duo_ppp_test(adapter_ptr)))
-    {
-        EWF_LOG_ERROR("The NetX Duo test example failed, ewf_result %d.\n", result);
-        exit(result);
+
+		/* Wait time for modem to be ready after modem is registered to network */
+		ewf_platform_sleep(200);
+
+		// Set the SIM PIN
+		if (0) //ewf_result_failed(result = ewf_adapter_modem_sim_pin_enter(adapter_ptr, EWF_CONFIG_SIM_PIN))) bahmed
+		{
+			EWF_LOG_ERROR("Failed to the SIM PIN, ewf_result %d.\n", result);
+			exit(result);
+		}
+		else
+		{
+			EWF_LOG("SIM PIN Set.\n");
+		}
+
+		if (ewf_result_failed(result = ewf_adapter_modem_network_registration_check(adapter_ptr, EWF_ADAPTER_MODEM_CMD_QUERY_EPS_NETWORK_REG, 1000)))
+		{
+			EWF_LOG("[ERROR][Failed to register to network.]\n");
+			return;
+		}
+		else
+		{
+			EWF_LOG("Registered to network.\n");
+		}
+
+
+		// Call the NetX Duo test example
+		if (ewf_result_failed(result = ewf_example_netx_duo_ppp_test(adapter_ptr)))
+		{
+			EWF_LOG_ERROR("The NetX Duo test example failed, ewf_result %d.\n", result);
+			exit(result);
+		}
+			else
+		{
+			EWF_LOG("The NetX Duo test example passed.\n");
+		}
+		ewf_platform_sleep(EWF_PLATFORM_TICKS_PER_SECOND*10);
     }
-    	else
-	{
-		EWF_LOG("The NetX Duo test example passed.\n");
-	}
 
     EWF_LOG("\nDone!\n");
 
@@ -314,7 +344,6 @@ void sample_thread_entry(ULONG parameter)
         ewf_platform_sleep(EWF_PLATFORM_TICKS_PER_SECOND);
     }
 }
-#endif
 
 void thread_sample_entry(ULONG thread_input)
 {
@@ -372,7 +401,7 @@ void thread_sample_entry(ULONG thread_input)
     }
 #endif
 
-#if(MODEM_TYPE == RENESAS_RYZ024A)
+#if((MODEM_TYPE == RENESAS_RYZ024A) || (MODEM_TYPE == SIERRA_HL78XX))
 	sample_thread_entry(thread_input);
 	return;
 #endif
