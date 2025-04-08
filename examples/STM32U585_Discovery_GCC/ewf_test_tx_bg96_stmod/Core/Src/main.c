@@ -38,6 +38,7 @@
 #define QUECTEL_BG96 		1
 #define RENESAS_RYZ024A 	2
 
+#define NX_DISABLE_ERROR_CHECKING
 #define MODEM_TYPE RENESAS_RYZ024A
 
 
@@ -91,6 +92,9 @@
 #endif
 
 #include "ewf_example.config.h"
+
+#include "ewf_netxduo_ppp.c"
+#include "examples/ewf_example_netx_duo_ppp_test.c"
 
 /* USER CODE END Includes */
 
@@ -739,7 +743,7 @@ PUTCHAR_PROTOTYPE
 {
     /* Place your implementation of fputc here */
     /* e.g. write a character to the USART1 and Loop until the end of transmission */
-    //ITM_SendChar(ch);
+    ITM_SendChar(ch);
 	uint8_t c = (uint8_t) ch;
 	HAL_UART_Transmit(&huart1, &c, 1,100);
     return ch;
