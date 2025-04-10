@@ -52,6 +52,10 @@ ewf_adapter_api_udp ewf_adapter_sierra_common_api_udp =
     ewf_adapter_sierra_common_udp_receive_from,
 };
 
+// default EOF pattern
+const uint8_t eof_pattern[] = "--EOF--Pattern--";
+
+
 /******************************************************************************
  *
  * Internal functions
@@ -283,9 +287,18 @@ static ewf_result _ewf_adapter_sierra_common_internet_socket_open(ewf_adapter* a
     char accept_any_remote_str[3] = {0};
     const char* accept_any_remote_cstr = ewfl_unsigned_to_str(accept_any_remote, accept_any_remote_str, sizeof(accept_any_remote_str));
 
-    // Close outstanding connections just in case
-    if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr, "AT+SQNSH=", connection_id_cstr, "\r", NULL))) return result;
+    //TODO: FIXME bahmed: we may need to move this into an API to activate and deactivate the IP service in the modem
+    if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr, "AT+KCNXDOWN=", connection_id_cstr, "\r", NULL))) return result;
     if (ewf_result_failed(result = ewf_interface_drop_response(interface_ptr))) return result;
+    if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr, "AT+KCNXUP=", connection_id_cstr, "\r", NULL))) return result;
+    if (ewf_result_failed(result = ewf_interface_drop_response(interface_ptr))) return result;
+
+    // Close outstanding connections just in case
+    if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr, "AT+KTCPCLOSE=", connection_id_cstr, "\r", NULL))) return result;
+    if (ewf_result_failed(result = ewf_interface_drop_response(interface_ptr))) return result;
+    if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr, "AT+KTCPDEL=", connection_id_cstr, "\r", NULL))) return result;
+    if (ewf_result_failed(result = ewf_interface_drop_response(interface_ptr))) return result;
+
 
     char remote_port_str[8] = {0};
     const char* remote_port_cstr = ewfl_unsigned_to_str(remote_port, remote_port_str, sizeof(remote_port_str));
@@ -294,23 +307,48 @@ static ewf_result _ewf_adapter_sierra_common_internet_socket_open(ewf_adapter* a
     char udp_local_port_str[8] = {0};
     const char* udp_local_port_cstr = ewfl_unsigned_to_str(udp_local_port, udp_local_port_str, sizeof(udp_local_port_str));
 
-    if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr, "AT+SQNSCFG=", connection_id_cstr, ",", context_id_cstr,", 0, 0, 600, 50\r", NULL))) return result;
-    if (ewf_result_failed(result = ewf_interface_verify_response(interface_ptr, "\r\nOK\r\n"))) return result;
+    //TODO: FIXME
+    //if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr, "AT+SQNSCFG=", connection_id_cstr, ",", context_id_cstr,", 0, 0, 600, 50\r", NULL))) return result;
+    //if (ewf_result_failed(result = ewf_interface_verify_response(interface_ptr, "\r\nOK\r\n"))) return result;
 
-    if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr, "AT+SQNSCFGEXT=", connection_id_cstr, ",0,0,0\r", NULL))) return result;
-    if (ewf_result_failed(result = ewf_interface_verify_response(interface_ptr, "\r\nOK\r\n"))) return result;
+    //TODO: FIXME
+    //if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr, "AT+SQNSCFGEXT=", connection_id_cstr, ",0,0,0\r", NULL))) return result;
+    //if (ewf_result_failed(result = ewf_interface_verify_response(interface_ptr, "\r\nOK\r\n"))) return result;
 
     if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr,
-            "AT+SQNSD=",
-            connection_id_cstr, ",",
-            service_type_cstr, ",",
-            remote_port_cstr, ",",
+            "AT+KTCPCFG=",
+            connection_id_cstr, ",0,",
             "\"",server_str,"\",",
-            "0,",udp_local_port_cstr,",1,",
-            accept_any_remote_cstr,
+			"\"",remote_port_cstr,"\"",
             "\r",
             NULL))) return result;
-    if (ewf_result_failed(result = ewf_interface_verify_response(interface_ptr, "\r\nOK\r\n"))) return result;
+    if (ewf_result_failed(result = ewf_interface_verify_response_starts_with(interface_ptr, "\r\n+KTCPCFG: "))) return result; //TODO, check for connection_id_cstr as well
+    //if (ewf_result_failed(result = ewf_interface_verify_response_starts_with(interface_ptr, connection_id_cstr))) return result;
+    //if (ewf_result_failed(result = ewf_interface_verify_response(interface_ptr, "\r\nOK\r\n"))) return result;
+
+    if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr, "AT+KTCPCNX=", connection_id_cstr, "\r", NULL))) return result;
+    if (ewf_result_failed(result = ewf_interface_verify_response(interface_ptr, "\r\nOK\r\n"))) return result; //TODO: make 1,1 dynamic, based on the connection_id_cstr
+    int i=0;
+
+    while(1)
+    {
+    	i++;
+    	if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr, "AT+KTCPSTAT=", connection_id_cstr, "\r", NULL))) return result;
+    	if (ewf_result_failed(result = ewf_interface_verify_response_starts_with(interface_ptr, "\r\n+KTCPSTAT: 3,-1")))
+    	{
+    		if(i > 60)
+    		{
+    			return result; //TODO: make 1,1 dynamic, based on the connection_id_cstr
+    		}
+    	}
+    	else
+    	{
+    		break;
+    	}
+
+    	ewf_platform_sleep(EWF_PLATFORM_TICKS_PER_SECOND);
+
+    }
 
     adapter_sierra_common_ptr->internet_socket_pool[internet_socket_ptr->id - 1].conn = true;
     adapter_sierra_common_ptr->internet_socket_pool[internet_socket_ptr->id - 1].conn_error = false;
@@ -423,7 +461,7 @@ static ewf_result _ewf_adapter_sierra_common_internet_socket_send(ewf_adapter* a
     {
         ewf_tokenizer_basic_pattern* tokenizer_basic_command_response_pattern_saved_ptr = NULL;
 
-        char tokenizer_pattern_str[] = "\r\n> ";
+        char tokenizer_pattern_str[] = "\r\nCONNECT\r\n";
         ewf_tokenizer_basic_pattern tokenizer_pattern = {
             NULL,
             tokenizer_pattern_str,
@@ -444,7 +482,7 @@ static ewf_result _ewf_adapter_sierra_common_internet_socket_send(ewf_adapter* a
 
         result_send_command = ewf_interface_send_commands(
                 interface_ptr,
-                "AT+SQNSSENDEXT=",
+                "AT+KTCPSND=",
                 connection_id_cstr, ",",
                 buffer_length_cstr, "\r",
                 NULL);
@@ -491,6 +529,8 @@ static ewf_result _ewf_adapter_sierra_common_internet_socket_send(ewf_adapter* a
         if (ewf_result_failed(result)) return result;
 
         result_send = ewf_interface_send(interface_ptr, (const uint8_t*)buffer_ptr, buffer_length);
+
+        ewf_interface_send(interface_ptr, (const uint8_t*)eof_pattern, sizeof(eof_pattern));
 
         if (ewf_result_succeeded(result_send))
         {
@@ -548,7 +588,7 @@ static bool _ewf_adapter_sierra_common_sqnsrecv_message_tokenizer_pattern_match_
         (struct _ewf_adapter_sierra_common_sqnsrecv_message_tokenizer_pattern_match_function_state*)pattern_ptr->data_ptr;
 
     /* Define the message prefix and calculate its length */
-    const uint8_t prefix_str[] = "\r\n+SQNSRECV: ";
+    const uint8_t prefix_str[] = "\r\nCONNECT";
     const uint32_t prefix_length = sizeof(prefix_str) - 1;
 
     /* If the buffer is smaller than the prefix, then it is not yet for us */
@@ -589,12 +629,12 @@ static bool _ewf_adapter_sierra_common_sqnsrecv_message_tokenizer_pattern_match_
         if (buffer_ptr[buffer_length - 2] == '\r' && buffer_ptr[buffer_length - 1] == '\n')
         {
             /* The message is complete, try to parse it */
-            char* p = NULL;
-            p = (char *)buffer_ptr + (sizeof(prefix_str) - 1) + 2; /* skip characters until actual receive length */
-            state_ptr->read_actual_length = ewfl_str_to_unsigned(p);
+            //char* p = NULL;
+            //p = (char *)buffer_ptr + (sizeof(prefix_str) - 1) + 2; /* skip characters until actual receive length */
+            //state_ptr->read_actual_length = ewfl_str_to_unsigned(p);
 
-            state_ptr->total_expected_length = buffer_length + state_ptr->read_actual_length + 2 + 6; /* counting lenght until end of "\r\n\r\nOK\r\n" */
-            state_ptr->data_ptr = (uint8_t*)buffer_ptr + buffer_length;
+            state_ptr->total_expected_length = buffer_length + 2 + state_ptr->read_actual_length; //+ state_ptr->read_actual_length + 2 + 6; /* counting lenght until end of "\r\n\r\nOK\r\n" */
+            state_ptr->data_ptr = (uint8_t*)buffer_ptr + buffer_length + 2;
 
             state_ptr->parsed = true;
         }
@@ -603,6 +643,7 @@ static bool _ewf_adapter_sierra_common_sqnsrecv_message_tokenizer_pattern_match_
     }
 
     /* From this point we parsed data */
+    EWF_LOG("[SQNRCV: b=%d, t=%d]\r", buffer_length,state_ptr->total_expected_length);
 
     /* Is the message complete? */
     if ((buffer_length) >= state_ptr->total_expected_length)
@@ -679,12 +720,12 @@ static ewf_result _ewf_adapter_sierra_common_internet_socket_receive(
         for (; t; t--)
         {
             uint32_t socket_id = 0;
-            uint32_t total_sent_length = 0;
-            uint32_t total_receive_length = 0;
-            uint32_t unread_length = 0;
-            uint32_t total_sent_not_acknowledged = 0;
+            uint32_t socket_status=0;
+            uint32_t tcp_notif=0;
+            uint32_t rem_data = 0;
+            uint32_t rcv_data = 0;
 
-            result = ewf_interface_send_commands(interface_ptr, "AT+SQNSI=", connection_id_cstr, "\r", NULL);
+            result = ewf_interface_send_commands(interface_ptr, "AT+KTCPSTAT=", connection_id_cstr, "\r", NULL);
             if (ewf_result_failed(result))
             {
                 return result;
@@ -694,42 +735,47 @@ static ewf_result _ewf_adapter_sierra_common_internet_socket_receive(
             result = ewf_interface_receive_response(interface_ptr, &response_ptr, &response_length, 200);
             if (ewf_result_succeeded(result))
             {
-                unread_length = 0;
-                const char match_str[] = "\r\n+SQNSI: ";
-                if (ewfl_str_starts_with((char*)response_ptr, match_str))
+            	rcv_data = 0;
+                const char match_str[] = "\r\n+KTCPSTAT: ";
+                char *match_ptr = ewfl_strstr((char*)response_ptr, match_str);
+                if (match_ptr != NULL)
                 {
-                    char* parse_str = (char*)(response_ptr + ewfl_str_length(match_str));
+                    char* parse_str = (char*)(match_ptr + ewfl_str_length(match_str));
                     socket_id = ewfl_str_to_unsigned(parse_str);
+
                     while (*parse_str && ewfl_char_is_digit((unsigned char)*parse_str)) parse_str++;
                     parse_str++; /* Skip ',' */
-                    total_sent_length = ewfl_str_to_unsigned(parse_str);
+                    socket_status = ewfl_str_to_unsigned(parse_str);
+
                     while (*parse_str && ewfl_char_is_digit((unsigned char)*parse_str)) parse_str++;
                     parse_str++; /* Skip ',' */
-                    total_receive_length = ewfl_str_to_unsigned(parse_str);
+                    tcp_notif = ewfl_str_to_unsigned(parse_str);
+
                     while (*parse_str && ewfl_char_is_digit((unsigned char)*parse_str)) parse_str++;
                     parse_str++; /* Skip ',' */
-                    unread_length = ewfl_str_to_unsigned(parse_str);
+                    rem_data = ewfl_str_to_unsigned(parse_str);
+
                     while (*parse_str && ewfl_char_is_digit((unsigned char)*parse_str)) parse_str++;
                     parse_str++; /* Skip ',' */
-                    total_sent_not_acknowledged = ewfl_str_to_unsigned(parse_str);
+                    rcv_data = ewfl_str_to_unsigned(parse_str);
 
                 }
             }
 
             EWF_PARAMETER_NOT_USED(socket_id);
-            EWF_PARAMETER_NOT_USED(total_sent_length);
-            EWF_PARAMETER_NOT_USED(total_receive_length);
-            EWF_PARAMETER_NOT_USED(total_sent_not_acknowledged);
+            EWF_PARAMETER_NOT_USED(socket_status);
+            EWF_PARAMETER_NOT_USED(tcp_notif);
+            EWF_PARAMETER_NOT_USED(rem_data);
 
             ewf_interface_release(interface_ptr, response_ptr);
 
             if (ewf_result_failed(result))
             {
-                EWF_LOG_ERROR("Unexpected response format, response [%s]!\n", (char*)response_ptr);
+                EWF_LOG_ERROR("Unexpected response format\n"); //, response [%s]!\n", (char*)response_ptr); //!!! reponse_ptr has been released on the line above, why is trying to print it!
                 return result;
             }
 
-            if (unread_length)
+            if (rcv_data)
             {
                 break;
             }
@@ -761,116 +807,49 @@ static ewf_result _ewf_adapter_sierra_common_internet_socket_receive(
     char read_length_str[8] = {0};
     char* read_length_cstr = ewfl_unsigned_to_str(read_length, read_length_str, sizeof(read_length_str));
 
-    struct _ewf_adapter_sierra_common_sqnsrecv_message_tokenizer_pattern_match_function_state ewf_adapter_sierra_common_sqnsrecv_message_tokenizer_pattern_match_function_state = { 0 };
-    ewf_adapter_sierra_common_sqnsrecv_message_tokenizer_pattern_match_function_state.interface_ptr = interface_ptr;
 
     {
-        ewf_tokenizer_basic_pattern ewf_adapter_sierra_common_sqnsrev_message_tokenizer_pattern =
-        {
-            NULL,
-            NULL,
-            0,
-            false,
-            _ewf_adapter_sierra_common_sqnsrecv_message_tokenizer_pattern_match_function,
-            &ewf_adapter_sierra_common_sqnsrecv_message_tokenizer_pattern_match_function_state
-        };
-
-        ewf_tokenizer_basic_data* tokenizer_data_ptr = (ewf_tokenizer_basic_data*)interface_ptr->tokenizer_ptr->data_ptr;
-
-        ewf_tokenizer_basic_pattern* tokenizer_basic_message_pattern_saved_ptr = NULL;
-        ewf_tokenizer_basic_pattern* tokenizer_basic_command_response_pattern_saved_ptr = NULL;
-        ewf_tokenizer_basic_pattern* tokenizer_basic_command_response_end_pattern_saved_ptr = NULL;
-        ewf_tokenizer_basic_pattern* tokenizer_basic_urc_pattern_saved_ptr = NULL;
 
         ewf_result ewf_result_send_command = EWF_RESULT_OK;
         ewf_result ewf_result_receive_response = EWF_RESULT_OK;
 
-        if (ewf_result_failed(result = ewf_tokenizer_basic_message_pattern_get(tokenizer_data_ptr, &tokenizer_basic_message_pattern_saved_ptr))) return result;
-        if (ewf_result_failed(result = ewf_tokenizer_basic_command_response_pattern_get(tokenizer_data_ptr, &tokenizer_basic_command_response_pattern_saved_ptr))) return result;
-        if (ewf_result_failed(result = ewf_tokenizer_basic_command_response_end_pattern_get(tokenizer_data_ptr, &tokenizer_basic_command_response_end_pattern_saved_ptr))) return result;
-        if (ewf_result_failed(result = ewf_tokenizer_basic_urc_pattern_get(tokenizer_data_ptr, &tokenizer_basic_urc_pattern_saved_ptr))) return result;
-
-        if (ewf_result_succeeded(result = ewf_tokenizer_basic_message_pattern_set(tokenizer_data_ptr, &ewf_adapter_sierra_common_sqnsrev_message_tokenizer_pattern))&&
-            ewf_result_succeeded(result = ewf_tokenizer_basic_command_response_pattern_set(tokenizer_data_ptr, NULL))&&
-            ewf_result_succeeded(result = ewf_tokenizer_basic_command_response_end_pattern_set(tokenizer_data_ptr, NULL))&&
-            ewf_result_succeeded(result = ewf_tokenizer_basic_urc_pattern_set(tokenizer_data_ptr, NULL)))
         {
             ewf_result_send_command = ewf_interface_send_commands(
                 interface_ptr,
-                "AT+SQNSRECV=",
+                "AT+KTCPRCV=",
                 connection_id_cstr, ",",
                 read_length_cstr, "\r",
                 NULL);
 
+
+
             if (ewf_result_succeeded(ewf_result_send_command))
             {
-                ewf_result_receive_response = ewf_interface_receive_response(interface_ptr, &response_ptr, &response_length, interface_ptr->default_timeout);
+            	char response_prefix[] = "\r\nCONNECT\r\n";
+            	char response_postfix[] = "--EOF--Pattern\r\nOK\r\n";
+                result = ewf_interface_receive_response(interface_ptr, &response_ptr, &response_length, 30);
+                if (ewf_result_failed(result)) return result;
+
+            	if(ewf_result_succeeded(result))
+            	{
+            	    //result = ewf_interface_receive_response(interface_ptr, &response_ptr, &response_length, 30);
+            	    //if (ewf_result_failed(result)) return result;
+
+            	    /* Copy the response */
+					*buffer_length_ptr = (*buffer_length_ptr >= response_length) ? response_length : *buffer_length_ptr;
+					memcpy(buffer_ptr, response_ptr, *buffer_length_ptr);
+
+            	    /* Release the buffer */
+            	    result = ewf_interface_release(interface_ptr, response_ptr);
+
+            	}
             }
 
-            ewf_result result_restore_message_pattern = ewf_tokenizer_basic_message_pattern_set(tokenizer_data_ptr, tokenizer_basic_message_pattern_saved_ptr);
-            ewf_result result_restore_command_response_pattern = ewf_tokenizer_basic_command_response_pattern_set(tokenizer_data_ptr, tokenizer_basic_command_response_pattern_saved_ptr);
-            ewf_result result_restore_command_response_end_pattern  = ewf_tokenizer_basic_command_response_end_pattern_set(tokenizer_data_ptr, tokenizer_basic_command_response_end_pattern_saved_ptr);
-            ewf_result result_restore_urc_pattern = ewf_tokenizer_basic_urc_pattern_set(tokenizer_data_ptr, tokenizer_basic_urc_pattern_saved_ptr);
-
-            if (ewf_result_failed(result_restore_message_pattern))
-            {
-                *buffer_length_ptr = 0;
-                if (ewf_result_succeeded(ewf_result_receive_response))
-                {
-                    ewf_interface_release(interface_ptr, response_ptr);
-                }
-                return result_restore_message_pattern;
-            }
-            if (ewf_result_failed(result_restore_command_response_pattern))
-            {
-                *buffer_length_ptr = 0;
-                if (ewf_result_succeeded(ewf_result_receive_response))
-                {
-                    ewf_interface_release(interface_ptr, response_ptr);
-                }
-                return result_restore_command_response_pattern;
-            }
-            if (ewf_result_failed(result_restore_command_response_end_pattern))
-            {
-                *buffer_length_ptr = 0;
-                if (ewf_result_succeeded(ewf_result_receive_response))
-                {
-                    ewf_interface_release(interface_ptr, response_ptr);
-                }
-                return result_restore_command_response_end_pattern;
-            }
-            if (ewf_result_failed(result_restore_urc_pattern))
-            {
-                *buffer_length_ptr = 0;
-                if (ewf_result_succeeded(ewf_result_receive_response))
-                {
-                    ewf_interface_release(interface_ptr, response_ptr);
-                }
-                return result_restore_urc_pattern;
-            }
         }
 
-        if (ewf_result_failed(ewf_result_send_command))
-        {
-            *buffer_length_ptr = 0;
-            return ewf_result_send_command;
-        }
 
-        if (ewf_result_failed(ewf_result_receive_response))
-        {
-            *buffer_length_ptr = 0;
-            return ewf_result_receive_response;
-        }
     }
 
-    /* Copy the buffer */
-    memcpy(buffer_ptr, ewf_adapter_sierra_common_sqnsrecv_message_tokenizer_pattern_match_function_state.data_ptr, ewf_adapter_sierra_common_sqnsrecv_message_tokenizer_pattern_match_function_state.read_actual_length);
-
-    /* Feed the data length received back to calling application/driver */
-    *buffer_length_ptr = ewf_adapter_sierra_common_sqnsrecv_message_tokenizer_pattern_match_function_state.read_actual_length;
-
-    /* Release the buffer */
-    result = ewf_interface_release(interface_ptr, response_ptr);
 
     if (ewf_result_failed(result))
     {
@@ -879,7 +858,7 @@ static ewf_result _ewf_adapter_sierra_common_internet_socket_receive(
     }
 
 #ifdef EWF_DEBUG
-    if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr, "AT+SQNSI=", connection_id_cstr, "\r", NULL))) return result;
+    if (ewf_result_failed(result = ewf_interface_send_commands(interface_ptr, "AT+KTCPSTAT=", connection_id_cstr, "\r", NULL))) return result;
     result = ewf_interface_receive_response(interface_ptr, &response_ptr, &response_length, 200);
     if (ewf_result_failed(result)) return result;
     ewf_interface_release(interface_ptr, response_ptr);

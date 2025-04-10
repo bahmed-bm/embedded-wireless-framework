@@ -396,3 +396,9 @@ uint32_t ewfl_char_is_digit(char c)
 {
     return((c) >= '0' && (c) <= '9');
 }
+
+
+char *ewfl_strstr(const char *s1, const char *s2)
+{
+	return strstr(s1,s2);
+}

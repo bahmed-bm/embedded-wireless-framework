@@ -241,7 +241,7 @@ void sample_thread_entry(ULONG parameter)
 #endif
 
 #if(MODEM_TYPE == SIERRA_HL78XX)
-    EWF_ADAPTER_SIERRA_HL78XX_STATIC_DECLARE(adapter_ptr, renesas_ryz024a, message_allocator_ptr, NULL, interface_ptr);
+    EWF_ADAPTER_SIERRA_HL78XX_STATIC_DECLARE(adapter_ptr, sierra_hl78xx, message_allocator_ptr, NULL, interface_ptr);
 #endif
 
 	/* Power on the STMOD+ BG96 modem */

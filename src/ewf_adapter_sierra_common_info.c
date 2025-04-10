@@ -254,6 +254,12 @@ ewf_result ewf_adapter_sierra_common_get_ipv4_dns(ewf_adapter* adapter_ptr, uint
         int context_id;
         int bearer_id;
         char apn[64] = {0};
+        char ip_and_mask[32]; // format nnn.nnn.nnn.nnn.nnn.nnn.nnn.nnn where nnn = 0 to 255 (maximum possible is 31)
+
+        int gateway_a;
+        int gateway_b;
+        int gateway_c;
+        int gateway_d;
 
         int dns1_a;
         int dns1_b;
@@ -267,11 +273,12 @@ ewf_result ewf_adapter_sierra_common_get_ipv4_dns(ewf_adapter* adapter_ptr, uint
 
         int fields = sscanf(
             (char*)response,
-            "\r\n+CGCONTRDP: %d,%d,\"%64[^\"]\",\"%*d.%*d.%*d.%*d.%*d.%*d.%*d.%*d\",\"\",\"%d.%d.%d.%d\",\"%d.%d.%d.%d\"",
-            &context_id, &bearer_id, apn,
+            "\r\n+CGCONTRDP: %d,%d,\"%64[^\"]\",%32[^,],%d.%d.%d.%d,%d.%d.%d.%d,%d.%d.%d.%d",
+            &context_id, &bearer_id, apn, ip_and_mask,
+			&gateway_a, &gateway_b, &gateway_c, &gateway_d,
             &dns1_a, &dns1_b, &dns1_c, &dns1_d,
             &dns2_a, &dns2_b, &dns2_c, &dns2_d);
-        if (fields < 9)
+        if (fields < 16)
         {
             EWF_LOG_ERROR("Unexpected response format.");
             return EWF_RESULT_UNEXPECTED_RESPONSE;

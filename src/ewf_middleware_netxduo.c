@@ -240,6 +240,13 @@ VOID  nx_driver_ewf_adapter(NX_IP_DRIVER *driver_req_ptr)
         break;
     }
 
+    case NX_LINK_UNINITIALIZE:
+    {
+        /* Process link initialize requests.  */
+        //_nx_driver_uitialize(driver_req_ptr);
+        break;
+
+    }
     case NX_LINK_ENABLE:
     {
         /* Process link enable requests.  */
@@ -1131,7 +1138,7 @@ NX_PACKET_POOL *pool_ptr = nx_driver_information.nx_driver_information_packet_po
                     result = ewf_adapter_udp_receive_from(
                         &nx_driver_sockets[i].udp_socket,
                         NULL, NULL, NULL,
-                        (char*)(packet_ptr->nx_packet_prepend_ptr),
+                        (uint8_t*)(packet_ptr->nx_packet_prepend_ptr),
                         &len,
                         false);
                     data_length = len;
